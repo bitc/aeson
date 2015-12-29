@@ -86,11 +86,7 @@ import Data.Aeson.Types.JString (JString(..))
 import Data.JSString (JSString)
 import qualified Data.JSString as JSString
 
-#if MIN_VERSION_time(1,5,0)
 import Data.Time.Format (defaultTimeLocale, dateTimeFmt)
-#else
-import System.Locale (defaultTimeLocale, dateTimeFmt)
-#endif
 
 instance (ToJSON a) => ToJSON (Identity a) where
     toJSON (Identity a) = toJSON a
