@@ -99,7 +99,7 @@ library
     Data.Aeson.Types.Internal
 
   build-depends:
-    attoparsec >= 0.13.0.0,
+    --attoparsec >= 0.13.0.0,
     base == 4.*,
     bytestring >= 0.10.4.0,
     containers,
@@ -147,7 +147,7 @@ test-suite tests
     HUnit,
     QuickCheck,
     aeson,
-    attoparsec,
+    --attoparsec,
     base,
     bytestring,
     containers,
