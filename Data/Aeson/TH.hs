@@ -215,7 +215,7 @@ conStr :: Options -> Name -> Q Exp
 conStr opts = appE [|String|] . conTxt opts
 
 conTxt :: Options -> Name -> Q Exp
-conTxt opts = appE [|JSString.pack|] . conStringE opts
+conTxt opts = appE [|(JString . JSString.pack)|] . conStringE opts
 
 conStringE :: Options -> Name -> Q Exp
 conStringE opts = stringE . constructorTagModifier opts . nameBase
@@ -423,7 +423,7 @@ consFromJSON tName opts cons = do
                   [ liftM2 (,) (normalG $
                                   infixApp (varE txt)
                                            [|(==)|]
-                                           ([|JSString.pack|] `appE`
+                                           ([|(JString . JSString.pack)|] `appE`
                                               conStringE opts conName)
                                )
                                ([|pure|] `appE` conE conName)
@@ -435,7 +435,7 @@ consFromJSON tName opts cons = do
                       (normalG [|otherwise|])
                       ( [|noMatchFail|]
                         `appE` (litE $ stringL $ show tName)
-                        `appE` ([|JSString.unpack|] `appE` varE txt)
+                        `appE` ([|(JSString.unpack . unJString)|] `appE` varE txt)
                       )
                   ]
                  )
