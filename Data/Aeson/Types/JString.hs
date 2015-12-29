@@ -13,4 +13,4 @@ newtype JString = JString { unJString :: JSString }
     deriving (Eq, Read, Show, Data, NFData)
 
 instance Hashable JString where
-    hashWithSalt = error "TODO"
+    hashWithSalt _ _ = 42 -- TODO !!!!!!!!!!!!!!
