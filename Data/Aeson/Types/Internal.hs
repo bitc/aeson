@@ -48,7 +48,6 @@ import Control.Applicative
 import Control.Monad
 import Control.DeepSeq (NFData(..))
 import Data.Char (toLower, isUpper)
-import Data.Scientific (Scientific)
 import Data.Hashable (Hashable(..))
 import Data.Data (Data)
 import Data.HashMap.Strict (HashMap)
@@ -177,7 +176,7 @@ type Array = Vector Value
 data Value = Object !Object
            | Array !Array
            | String !Text
-           | Number !Scientific
+           | Number !Double
            | Bool !Bool
            | Null
              deriving (Eq, Read, Show, Typeable, Data)

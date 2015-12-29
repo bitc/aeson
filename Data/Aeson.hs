@@ -68,7 +68,6 @@ module Data.Aeson
     , withText
     , withArray
     , withNumber
-    , withScientific
     , withBool
     -- * Constructors and accessors
     , (.=)
@@ -82,8 +81,6 @@ module Data.Aeson
     ) where
 
 import Data.Aeson.Types
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as L
 
 -- | Efficiently deserialize a JSON value from a lazy 'L.ByteString'.
 -- If this fails due to incomplete or invalid input, 'Nothing' is

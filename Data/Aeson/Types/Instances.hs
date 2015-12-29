@@ -39,7 +39,6 @@ module Data.Aeson.Types.Instances
     , withText
     , withArray
     , withNumber
-    , withScientific
     , withBool
 
     -- * Functions
@@ -55,10 +54,6 @@ import Control.Applicative ((<$>), (<*>), (<|>), pure, empty)
 import Data.Aeson.Functions
 import Data.Aeson.Types.Class
 import Data.Aeson.Types.Internal
-import Data.Scientific (Scientific)
-import qualified Data.Scientific as Scientific (coefficient, base10Exponent, fromFloatDigits, toRealFloat)
-import Data.Attoparsec.Number (Number(..))
-import Data.Fixed
 import Data.Foldable (toList)
 import Data.Functor.Identity (Identity(..))
 import Data.Hashable (Hashable(..))
@@ -171,31 +166,12 @@ instance FromJSON Char where
                     else fail "Expected a string of length 1"
     {-# INLINE parseJSON #-}
 
-instance ToJSON Scientific where
-    toJSON = Number
-    {-# INLINE toJSON #-}
-
-instance FromJSON Scientific where
-    parseJSON = withScientific "Scientific" pure
-    {-# INLINE parseJSON #-}
-
 instance ToJSON Double where
     toJSON = realFloatToJSON
     {-# INLINE toJSON #-}
 
 instance FromJSON Double where
     parseJSON = parseRealFloat "Double"
-    {-# INLINE parseJSON #-}
-
-instance ToJSON Number where
-    toJSON (D d) = toJSON d
-    toJSON (I i) = toJSON i
-    {-# INLINE toJSON #-}
-
-instance FromJSON Number where
-    parseJSON (Number s) = pure $ scientificToNumber s
-    parseJSON Null       = pure (D (0/0))
-    parseJSON v          = typeMismatch "Number" v
     {-# INLINE parseJSON #-}
 
 instance ToJSON Float where
@@ -218,18 +194,6 @@ instance FromJSON (Ratio Integer) where
                       <*> obj .: "denominator"
     {-# INLINE parseJSON #-}
 
-instance HasResolution a => ToJSON (Fixed a) where
-    toJSON = Number . realToFrac
-    {-# INLINE toJSON #-}
-
--- | /WARNING:/ Only parse fixed-precision numbers from trusted input
--- since an attacker could easily fill up the memory of the target
--- system by specifying a scientific number with a big exponent like
--- @1e1000000000@.
-instance HasResolution a => FromJSON (Fixed a) where
-    parseJSON = withScientific "Fixed" $ pure . realToFrac
-    {-# INLINE parseJSON #-}
-
 instance ToJSON Int where
     toJSON = Number . fromIntegral
     {-# INLINE toJSON #-}
@@ -247,7 +211,7 @@ instance ToJSON Integer where
 -- specifying a scientific number with a big exponent like
 -- @1e1000000000@.
 instance FromJSON Integer where
-    parseJSON = withScientific "Integral" $ pure . floor
+    parseJSON = withNumber "Integral" $ pure . floor
     {-# INLINE parseJSON #-}
 
 instance ToJSON Int8 where
@@ -1082,17 +1046,10 @@ withArray expected _ v           = typeMismatch expected v
 
 -- | @withNumber expected f value@ applies @f@ to the 'Number' when @value@ is a 'Number'.
 --   and fails using @'typeMismatch' expected@ otherwise.
-withNumber :: String -> (Number -> Parser a) -> Value -> Parser a
-withNumber expected f = withScientific expected (f . scientificToNumber)
+withNumber :: String -> (Double -> Parser a) -> Value -> Parser a
+withNumber _       f (Number num) = f num
+withNumber expected _ v          = typeMismatch expected v
 {-# INLINE withNumber #-}
-{-# DEPRECATED withNumber "Use withScientific instead" #-}
-
--- | @withScientific expected f value@ applies @f@ to the 'Scientific' number when @value@ is a 'Number'.
---   and fails using @'typeMismatch' expected@ otherwise.
-withScientific :: String -> (Scientific -> Parser a) -> Value -> Parser a
-withScientific _        f (Number scientific) = f scientific
-withScientific expected _ v                   = typeMismatch expected v
-{-# INLINE withScientific #-}
 
 -- | @withBool expected f value@ applies @f@ to the 'Bool' when @value@ is a @Bool@
 --   and fails using @'typeMismatch' expected@ otherwise.
@@ -1174,24 +1131,15 @@ typeMismatch expected actual =
 realFloatToJSON :: RealFloat a => a -> Value
 realFloatToJSON d
     | isNaN d || isInfinite d = Null
-    | otherwise = Number $ Scientific.fromFloatDigits d
+    | otherwise = Number $ fromRational (toRational d)
 {-# INLINE realFloatToJSON #-}
 
-scientificToNumber :: Scientific -> Number
-scientificToNumber s
-    | e < 0     = D $ Scientific.toRealFloat s
-    | otherwise = I $ c * 10 ^ e
-  where
-    e = Scientific.base10Exponent s
-    c = Scientific.coefficient s
-{-# INLINE scientificToNumber #-}
-
 parseRealFloat :: RealFloat a => String -> Value -> Parser a
-parseRealFloat _        (Number s) = pure $ Scientific.toRealFloat s
+parseRealFloat _        (Number s) = pure $ fromRational (toRational s)
 parseRealFloat _        Null       = pure (0/0)
 parseRealFloat expected v          = typeMismatch expected v
 {-# INLINE parseRealFloat #-}
 
 parseIntegral :: Integral a => String -> Value -> Parser a
-parseIntegral expected = withScientific expected $ pure . floor
+parseIntegral expected = withNumber expected $ pure . floor
 {-# INLINE parseIntegral #-}
