@@ -53,13 +53,15 @@ import Data.Data (Data)
 import Data.HashMap.Strict (HashMap)
 import Data.Monoid (Monoid(..))
 import Data.String (IsString(..))
-import Data.Text (Text, pack)
 import Data.Time (UTCTime)
 import Data.Time.Format (FormatTime)
 import Data.Typeable (Typeable)
 import Data.Vector (Vector)
 import qualified Data.HashMap.Strict as H
 import qualified Data.Vector as V
+
+import Data.Aeson.Types.JString (JString(..))
+import qualified Data.JSString as JSString
 
 -- | The result of running a 'Parser'.
 data Result a = Error String
@@ -167,7 +169,7 @@ apP d e = do
 {-# INLINE apP #-}
 
 -- | A JSON \"object\" (key\/value map).
-type Object = HashMap Text Value
+type Object = HashMap JString Value
 
 -- | A JSON \"array\" (sequence).
 type Array = Vector Value
@@ -175,7 +177,7 @@ type Array = Vector Value
 -- | A JSON value represented as a Haskell value.
 data Value = Object !Object
            | Array !Array
-           | String !Text
+           | String !JString
            | Number !Double
            | Bool !Bool
            | Null
@@ -201,7 +203,7 @@ instance NFData Value where
     rnf Null       = ()
 
 instance IsString Value where
-    fromString = String . pack
+    fromString = String . JString . JSString.pack
     {-# INLINE fromString #-}
 
 hashValue :: Int -> Value -> Int
@@ -247,7 +249,7 @@ parseEither m v = runParser (m v) Left Right
 {-# INLINE parseEither #-}
 
 -- | A key\/value pair for an 'Object'.
-type Pair = (Text, Value)
+type Pair = (JString, Value)
 
 -- | Create a 'Value' from a list of name\/value 'Pair's.  If duplicate
 -- keys arise, earlier keys and their associated values win.

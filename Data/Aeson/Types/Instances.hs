@@ -61,7 +61,6 @@ import Data.Int (Int8, Int16, Int32, Int64)
 import Data.Maybe (fromMaybe)
 import Data.Monoid (Dual(..), First(..), Last(..))
 import Data.Ratio (Ratio, (%), numerator, denominator)
-import Data.Text (Text, pack, unpack)
 import Data.Time (UTCTime, ZonedTime(..), TimeZone(..))
 import Data.Time.Format (FormatTime, formatTime, parseTime)
 import Data.Traversable (traverse)
@@ -76,14 +75,16 @@ import qualified Data.Map as M
 import qualified Data.Set as Set
 import qualified Data.Sequence as Seq
 import qualified Data.Tree as Tree
-import qualified Data.Text as T
-import qualified Data.Text.Lazy as LT
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Primitive as VP
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Unboxed as VU
 import qualified Data.Vector.Mutable as VM ( unsafeNew, unsafeWrite )
+
+import Data.Aeson.Types.JString (JString(..))
+import Data.JSString (JSString)
+import qualified Data.JSString as JSString
 
 #if MIN_VERSION_time(1,5,0)
 import Data.Time.Format (defaultTimeLocale, dateTimeFmt)
@@ -116,15 +117,15 @@ instance (ToJSON a, ToJSON b) => ToJSON (Either a b) where
 
 instance (FromJSON a, FromJSON b) => FromJSON (Either a b) where
     parseJSON (Object (H.toList -> [(key, value)]))
-        | key == left  = Left  <$> parseJSON value
-        | key == right = Right <$> parseJSON value
-    parseJSON _        = fail $
+        | key == JString left  = Left  <$> parseJSON value
+        | key == JString right = Right <$> parseJSON value
+    parseJSON _                = fail $
         "expected an object with a single property " ++
         "where the property key should be either " ++
         "\"Left\" or \"Right\""
     {-# INLINE parseJSON #-}
 
-left, right :: Text
+left, right :: JSString
 left  = "Left"
 right = "Right"
 
@@ -148,21 +149,21 @@ instance FromJSON () where
     {-# INLINE parseJSON #-}
 
 instance ToJSON [Char] where
-    toJSON = String . T.pack
+    toJSON = String . JString . JSString.pack
     {-# INLINE toJSON #-}
 
 instance FromJSON [Char] where
-    parseJSON = withText "String" $ pure . T.unpack
+    parseJSON = withText "String" $ pure . JSString.unpack
     {-# INLINE parseJSON #-}
 
 instance ToJSON Char where
-    toJSON = String . T.singleton
+    toJSON = String . JString . JSString.singleton
     {-# INLINE toJSON #-}
 
 instance FromJSON Char where
     parseJSON = withText "Char" $ \t ->
-                  if T.compareLength t 1 == EQ
-                    then pure $ T.head t
+                  if JSString.compareLength t 1 == EQ
+                    then pure $ JSString.head t
                     else fail "Expected a string of length 1"
     {-# INLINE parseJSON #-}
 
@@ -286,20 +287,12 @@ instance FromJSON Word64 where
     parseJSON = parseIntegral "Word64"
     {-# INLINE parseJSON #-}
 
-instance ToJSON Text where
-    toJSON = String
+instance ToJSON JSString where
+    toJSON = String . JString
     {-# INLINE toJSON #-}
 
-instance FromJSON Text where
-    parseJSON = withText "Text" pure
-    {-# INLINE parseJSON #-}
-
-instance ToJSON LT.Text where
-    toJSON = String . LT.toStrict
-    {-# INLINE toJSON #-}
-
-instance FromJSON LT.Text where
-    parseJSON = withText "Lazy Text" $ pure . LT.fromStrict
+instance FromJSON JSString where
+    parseJSON = withText "JSString" pure
     {-# INLINE parseJSON #-}
 
 instance (ToJSON a) => ToJSON [a] where
@@ -384,44 +377,13 @@ instance FromJSON a => FromJSON (IntMap.IntMap a) where
     parseJSON = fmap IntMap.fromList . parseJSON
     {-# INLINE parseJSON #-}
 
-instance (ToJSON v) => ToJSON (M.Map Text v) where
-    toJSON = Object . M.foldrWithKey (\k -> H.insert k . toJSON) H.empty
+instance (ToJSON v) => ToJSON (M.Map JSString v) where
+    toJSON = Object . M.foldrWithKey (\k -> H.insert (JString k) . toJSON) H.empty
     {-# INLINE toJSON #-}
 
-instance (FromJSON v) => FromJSON (M.Map Text v) where
+instance (FromJSON v) => FromJSON (M.Map JSString v) where
     parseJSON = withObject "Map Text a" $
-                  fmap (H.foldrWithKey M.insert M.empty) . traverse parseJSON
-
-instance (ToJSON v) => ToJSON (M.Map LT.Text v) where
-    toJSON = Object . mapHashKeyVal LT.toStrict toJSON
-
-instance (FromJSON v) => FromJSON (M.Map LT.Text v) where
-    parseJSON = fmap (hashMapKey LT.fromStrict) . parseJSON
-
-instance (ToJSON v) => ToJSON (M.Map String v) where
-    toJSON = Object . mapHashKeyVal pack toJSON
-
-instance (FromJSON v) => FromJSON (M.Map String v) where
-    parseJSON = fmap (hashMapKey unpack) . parseJSON
-
-instance (ToJSON v) => ToJSON (H.HashMap Text v) where
-    toJSON = Object . H.map toJSON
-    {-# INLINE toJSON #-}
-
-instance (FromJSON v) => FromJSON (H.HashMap Text v) where
-    parseJSON = withObject "HashMap Text a" $ traverse parseJSON
-
-instance (ToJSON v) => ToJSON (H.HashMap LT.Text v) where
-    toJSON = Object . mapKeyVal LT.toStrict toJSON
-
-instance (FromJSON v) => FromJSON (H.HashMap LT.Text v) where
-    parseJSON = fmap (mapKey LT.fromStrict) . parseJSON
-
-instance (ToJSON v) => ToJSON (H.HashMap String v) where
-    toJSON = Object . mapKeyVal pack toJSON
-
-instance (FromJSON v) => FromJSON (H.HashMap String v) where
-    parseJSON = fmap (mapKey unpack) . parseJSON
+                  fmap (H.foldrWithKey (M.insert . unJString) M.empty) . traverse parseJSON
 
 instance (ToJSON v) => ToJSON (Tree.Tree v) where
     toJSON (Tree.Node root branches) = toJSON (root,branches)
@@ -439,21 +401,21 @@ instance FromJSON Value where
 
 instance ToJSON DotNetTime where
     toJSON (DotNetTime t) =
-        String (pack (secs ++ formatMillis t ++ ")/"))
+        String (JString $ JSString.pack (secs ++ formatMillis t ++ ")/"))
       where secs  = formatTime defaultTimeLocale "/Date(%s" t
     {-# INLINE toJSON #-}
 
 instance FromJSON DotNetTime where
     parseJSON = withText "DotNetTime" $ \t ->
-        let (s,m) = T.splitAt (T.length t - 5) t
-            t'    = T.concat [s,".",m]
-        in case parseTime defaultTimeLocale "/Date(%s%Q)/" (unpack t') of
+        let (s,m) = JSString.splitAt (JSString.length t - 5) t
+            t'    = JSString.concat [s,".",m]
+        in case parseTime defaultTimeLocale "/Date(%s%Q)/" (JSString.unpack t') of
              Just d -> pure (DotNetTime d)
              _      -> fail "could not parse .NET time"
     {-# INLINE parseJSON #-}
 
 instance ToJSON ZonedTime where
-    toJSON t = String $ pack $ formatTime defaultTimeLocale format t
+    toJSON t = String $ JString $ JSString.pack $ formatTime defaultTimeLocale format t
       where
         format = "%FT%T." ++ formatMillis t ++ tzFormat
         tzFormat
@@ -472,7 +434,7 @@ instance FromJSON ZonedTime where
       <|> fail "could not parse ECMA-262 ISO-8601 date"
       where
         tryFormat f =
-          case parseTime defaultTimeLocale f (unpack t) of
+          case parseTime defaultTimeLocale f (JSString.unpack (unJString t)) of
             Just d -> pure d
             Nothing -> empty
         tryFormats = foldr1 (<|>) . map tryFormat
@@ -500,14 +462,14 @@ instance FromJSON ZonedTime where
     parseJSON v = typeMismatch "ZonedTime" v
 
 instance ToJSON UTCTime where
-    toJSON t = String $ pack $ formatTime defaultTimeLocale format t
+    toJSON t = String $ JString $ JSString.pack $ formatTime defaultTimeLocale format t
       where
         format = "%FT%T." ++ formatSubseconds t ++ "Z"
     {-# INLINE toJSON #-}
 
 instance FromJSON UTCTime where
     parseJSON = withText "UTCTime" $ \t ->
-        case parseTime defaultTimeLocale "%FT%T%QZ" (unpack t) of
+        case parseTime defaultTimeLocale "%FT%T%QZ" (JSString.unpack t) of
           Just d -> pure d
           _      -> fail "could not parse ISO-8601 date"
     {-# INLINE parseJSON #-}
@@ -1032,8 +994,8 @@ withObject expected _ v            = typeMismatch expected v
 
 -- | @withText expected f value@ applies @f@ to the 'Text' when @value@ is a @String@
 --   and fails using @'typeMismatch' expected@ otherwise.
-withText :: String -> (Text -> Parser a) -> Value -> Parser a
-withText _        f (String txt) = f txt
+withText :: String -> (JSString -> Parser a) -> Value -> Parser a
+withText _        f (String txt) = f (unJString txt)
 withText expected _ v            = typeMismatch expected v
 {-# INLINE withText #-}
 
@@ -1059,8 +1021,8 @@ withBool expected _ v          = typeMismatch expected v
 {-# INLINE withBool #-}
 
 -- | Construct a 'Pair' from a key and a value.
-(.=) :: ToJSON a => Text -> a -> Pair
-name .= value = (name, toJSON value)
+(.=) :: ToJSON a => JSString -> a -> Pair
+name .= value = (JString name, toJSON value)
 {-# INLINE (.=) #-}
 
 -- | Convert a value from JSON, failing if the types do not match.
@@ -1075,8 +1037,8 @@ fromJSON = parse parseJSON
 -- This accessor is appropriate if the key and value /must/ be present
 -- in an object for it to be valid.  If the key and value are
 -- optional, use '(.:?)' instead.
-(.:) :: (FromJSON a) => Object -> Text -> Parser a
-obj .: key = case H.lookup key obj of
+(.:) :: (FromJSON a) => Object -> JSString -> Parser a
+obj .: key = case H.lookup (JString key) obj of
                Nothing -> fail $ "key " ++ show key ++ " not present"
                Just v  -> parseJSON v
 {-# INLINE (.:) #-}
@@ -1088,8 +1050,8 @@ obj .: key = case H.lookup key obj of
 -- This accessor is most useful if the key and value can be absent
 -- from an object without affecting its validity.  If the key and
 -- value are mandatory, use '(.:)' instead.
-(.:?) :: (FromJSON a) => Object -> Text -> Parser (Maybe a)
-obj .:? key = case H.lookup key obj of
+(.:?) :: (FromJSON a) => Object -> JSString -> Parser (Maybe a)
+obj .:? key = case H.lookup (JString key) obj of
                Nothing -> pure Nothing
                Just v  -> parseJSON v
 {-# INLINE (.:?) #-}

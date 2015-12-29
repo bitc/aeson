@@ -108,12 +108,13 @@ import qualified Data.HashMap.Strict as H ( lookup, toList )
 -- from template-haskell:
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax ( VarStrictType )
--- from text:
-import qualified Data.Text as T ( Text, pack, unpack )
 -- from vector:
 import qualified Data.Vector as V ( unsafeIndex, null, length, create, fromList )
 import qualified Data.Vector.Mutable as VM ( unsafeNew, unsafeWrite )
 
+import Data.Aeson.Types.JString (JString(..))
+import Data.JSString (JSString)
+import qualified Data.JSString as JSString
 
 --------------------------------------------------------------------------------
 -- Convenience
@@ -214,7 +215,7 @@ conStr :: Options -> Name -> Q Exp
 conStr opts = appE [|String|] . conTxt opts
 
 conTxt :: Options -> Name -> Q Exp
-conTxt opts = appE [|T.pack|] . conStringE opts
+conTxt opts = appE [|JSString.pack|] . conStringE opts
 
 conStringE :: Options -> Name -> Q Exp
 conStringE opts = stringE . constructorTagModifier opts . nameBase
@@ -232,8 +233,8 @@ encodeSum opts multiCons conName exp
               [|Array|] `appE` ([|V.fromList|] `appE` listE [conStr opts conName, exp])
           TaggedObject{tagFieldName, contentsFieldName} ->
               [|object|] `appE` listE
-                [ infixApp [|T.pack tagFieldName|]     [|(.=)|] (conStr opts conName)
-                , infixApp [|T.pack contentsFieldName|] [|(.=)|] exp
+                [ infixApp [|JSString.pack tagFieldName|]     [|(.=)|] (conStr opts conName)
+                , infixApp [|JSString.pack contentsFieldName|] [|(.=)|] exp
                 ]
           ObjectWithSingleField ->
               [|object|] `appE` listE
@@ -313,7 +314,7 @@ encodeArgs opts multiCons (RecC conName ts) = do
                      [|(.=)|]
                      (varE arg)
 
-        toFieldName field = [|T.pack|] `appE` fieldLabelExp opts field
+        toFieldName field = [|JSString.pack|] `appE` fieldLabelExp opts field
 
     match (conP conName $ map varP args)
           ( normalB
@@ -324,7 +325,7 @@ encodeArgs opts multiCons (RecC conName ts) = do
                        [|object|] `appE`
                          -- TODO: Maybe throw an error in case
                          -- tagFieldName overwrites a field in pairs.
-                         infixApp (infixApp [|T.pack tagFieldName|]
+                         infixApp (infixApp [|JSString.pack tagFieldName|]
                                             [|(.=)|]
                                             (conStr opts conName))
                                   [|(:)|]
@@ -422,7 +423,7 @@ consFromJSON tName opts cons = do
                   [ liftM2 (,) (normalG $
                                   infixApp (varE txt)
                                            [|(==)|]
-                                           ([|T.pack|] `appE`
+                                           ([|JSString.pack|] `appE`
                                               conStringE opts conName)
                                )
                                ([|pure|] `appE` conE conName)
@@ -434,7 +435,7 @@ consFromJSON tName opts cons = do
                       (normalG [|otherwise|])
                       ( [|noMatchFail|]
                         `appE` (litE $ stringL $ show tName)
-                        `appE` ([|T.unpack|] `appE` varE txt)
+                        `appE` ([|JSString.unpack|] `appE` varE txt)
                       )
                   ]
                  )
@@ -497,7 +498,7 @@ consFromJSON tName opts cons = do
       doE [ bindS (varP conKey)
                   (infixApp (varE obj)
                             [|(.:)|]
-                            ([|T.pack|] `appE` stringE typFieldName))
+                            ([|JSString.pack|] `appE` stringE typFieldName))
           , noBindS $ parseContents conKey (Left (valFieldName, obj)) 'conNotFoundFailTaggedObject
           ]
 
@@ -554,7 +555,7 @@ consFromJSON tName opts cons = do
                       ( guardedB $
                         [ do g <- normalG $ infixApp (varE conKey)
                                                      [|(==)|]
-                                                     ([|T.pack|] `appE`
+                                                     ([|JSString.pack|] `appE`
                                                         conNameExp opts con)
                              e <- parseArgs tName opts con contents
                              return (g, e)
@@ -572,7 +573,7 @@ consFromJSON tName opts cons = do
                                                      . getConName
                                                      ) cons
                                                 )
-                                   `appE` ([|T.unpack|] `appE` varE conKey)
+                                   `appE` ([|JSString.unpack|] `appE` varE conKey)
                                  )
                         ]
                       )
@@ -621,7 +622,7 @@ parseRecord opts tName conName ts obj =
                `appE` (litE $ stringL $ show tName)
                `appE` (litE $ stringL $ constructorTagModifier opts $ nameBase conName)
                `appE` (varE obj)
-               `appE` ( [|T.pack|] `appE` fieldLabelExp opts field
+               `appE` ( [|JSString.pack|] `appE` fieldLabelExp opts field
                       )
              | (field, _, _) <- ts
              ]
@@ -631,7 +632,7 @@ getValField obj valFieldName matches = do
   val <- newName "val"
   doE [ bindS (varP val) $ infixApp (varE obj)
                                     [|(.:)|]
-                                    ([|T.pack|] `appE`
+                                    ([|JSString.pack|] `appE`
                                        (litE $ stringL valFieldName))
       , noBindS $ caseE (varE val) matches
       ]
@@ -746,12 +747,12 @@ parseTypeMismatch tName conName expected actual =
           ]
 
 class (FromJSON a) => LookupField a where
-    lookupField :: String -> String -> Object -> T.Text -> Parser a
+    lookupField :: String -> String -> Object -> JSString -> Parser a
 
 instance (FromJSON a) => LookupField a where
     lookupField tName rec obj key =
-        case H.lookup key obj of
-          Nothing -> unknownFieldFail tName rec (T.unpack key)
+        case H.lookup (JString key) obj of
+          Nothing -> unknownFieldFail tName rec (JSString.unpack key)
           Just v  -> parseJSON v
 
 instance (FromJSON a) => LookupField (Maybe a) where
