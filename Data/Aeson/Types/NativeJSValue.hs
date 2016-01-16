@@ -5,7 +5,7 @@ module Data.Aeson.Types.NativeJSValue where
 import GHCJS.Types
 import JavaScript.Array
 
-newtype NativeJSValue = NativeJSValue (JSRef ())
+newtype NativeJSValue = NativeJSValue JSVal
 
 #ifdef ghcjs_HOST_OS
 
@@ -38,15 +38,15 @@ foreign import javascript unsafe
       } \
       return result; \
     })($1);"
-    js_objectKeys :: NativeJSValue -> JSRef a
+    js_objectKeys :: NativeJSValue -> JSVal
 
 foreign import javascript unsafe
     "$r = $1.length;"
-    js_arrayLength :: JSRef a -> Int
+    js_arrayLength :: JSVal -> Int
 
 foreign import javascript unsafe
     "$r = $1[$2];"
-    js_arrayIndex :: JSRef a -> Int -> JSString
+    js_arrayIndex :: JSVal -> Int -> JSString
 
 foreign import javascript unsafe
     "$r = $1[$2];"
@@ -113,13 +113,13 @@ js_isBool = error "only available in JavaScript"
 js_isNull :: NativeJSValue -> Bool
 js_isNull = error "only available in JavaScript"
 
-js_objectKeys :: NativeJSValue -> JSRef a
+js_objectKeys :: NativeJSValue -> JSVal
 js_objectKeys = error "only available in JavaScript"
 
-js_arrayLength :: JSRef a -> Int
+js_arrayLength :: JSVal -> Int
 js_arrayLength = error "only available in JavaScript"
 
-js_arrayIndex :: JSRef a -> Int -> JSString
+js_arrayIndex :: JSVal -> Int -> JSString
 js_arrayIndex = error "only available in JavaScript"
 
 js_objectValue :: NativeJSValue -> JSString -> NativeJSValue

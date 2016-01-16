@@ -20,13 +20,13 @@ import GHCJS.Types
 nativeEncodeVal :: Value -> NativeJSValue
 nativeEncodeVal (Object o) =
     let (keys, vals) = unzip $ map (\(key, val) -> (unJString key, nativeEncodeVal val)) (H.toList o)
-        keysArray = fromList (map stringToJSRef keys)
-        valsArray = fromList (map valToJSRef vals)
+        keysArray = fromList (map stringToJSVal keys)
+        valsArray = fromList (map valToJSVal vals)
     in js_objectVal keysArray valsArray
 
 nativeEncodeVal (Array arr) =
     let vals = map nativeEncodeVal (V.toList arr)
-        valsArray = fromList (map valToJSRef vals)
+        valsArray = fromList (map valToJSVal vals)
     in js_arrayVal valsArray
 
 nativeEncodeVal (String str) = js_stringVal (unJString str)
@@ -34,11 +34,11 @@ nativeEncodeVal (Number num) = js_numberVal num
 nativeEncodeVal (Bool b) = js_boolVal b
 nativeEncodeVal Null = js_nullVal
 
-stringToJSRef :: JSString -> JSRef ()
-stringToJSRef = unsafeCoerce
+stringToJSVal :: JSString -> JSVal
+stringToJSVal = unsafeCoerce
 
-valToJSRef :: NativeJSValue -> JSRef ()
-valToJSRef = unsafeCoerce
+valToJSVal :: NativeJSValue -> JSVal
+valToJSVal = unsafeCoerce
 
 toString :: NativeJSValue -> JSString
 toString = js_nativeToString
