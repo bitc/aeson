@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -w #-}
 {-# LANGUAGE CPP, DeriveDataTypeable, FlexibleContexts, FlexibleInstances,
     GeneralizedNewtypeDeriving, IncoherentInstances, OverlappingInstances,
     OverloadedStrings, UndecidableInstances, ViewPatterns #-}

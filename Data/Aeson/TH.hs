@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -w #-}
 {-# LANGUAGE CPP, FlexibleInstances, IncoherentInstances, NamedFieldPuns,
     NoImplicitPrelude, OverlappingInstances, TemplateHaskell,
     UndecidableInstances #-}
